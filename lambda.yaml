@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Deploys a daily web scraping Lambda function to find job postings on AshbyHQ.
+  This stack creates an IAM Role, a Lambda function, and an EventBridge rule to trigger it once a day.
+
+Parameters:
+  SerpApiKey:
+    Type: String
+    NoEcho: true
+    Description: Your secret API key from SerpApi for web scraping.
+  
+  DataS3BucketName:
+    Type: String
+    Description: The name of the S3 bucket where the resulting JSON files will be stored (e.g., haranaka).
+    Default: haranaka
+
+  LambdaCodeS3Bucket:
+    Type: String
+    Description: The name of the S3 bucket where your Lambda deployment package (.zip file) is located.
+  
+  LambdaCodeS3Key:
+    Type: String
+    Description: The file name (key) of your Lambda deployment package in the S3 bucket (e.g., deployment_package.zip).
+    Default: deployment_package.zip
+  
+  ScheduleExpression:
+    Type: String
+    Description: The schedule for the EventBridge rule. Default is every day at 12:00 UTC.
+    Default: "cron(0 12 * * ? *)"
+
+Resources:
+  # 1. IAM Role para a função Lambda
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-LambdaExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaLoggingPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: 'arn:aws:logs:*:*:*'
+        - PolicyName: S3PutObjectPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub "arn:aws:s3:::${DataS3BucketName}/*"
+
+  # 2. A Função Lambda
+  WebScraperFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-AshbyScraperFunction"
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.11
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+      Timeout: 60 # Segundos
+      MemorySize: 256 # MB
+      Environment:
+        Variables:
+          S3_BUCKET_NAME: !Ref DataS3BucketName
+          SERPAPI_API_KEY: !Ref SerpApiKey
+    DependsOn:
+      - LambdaExecutionRole
+
+  # 3. Regra do EventBridge para agendamento diário
+  ScheduledRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${AWS::StackName}-DailyTrigger"
+      Description: "Rule to trigger the web scraper Lambda daily."
+      ScheduleExpression: !Ref ScheduleExpression
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt WebScraperFunction.Arn
+          Id: "WebScraperLambdaTarget"
+
+  # 4. Permissão para o EventBridge invocar a Lambda
+  LambdaPermissionForEventBridge:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt WebScraperFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ScheduledRule.Arn
+
+Outputs:
+  LambdaFunctionName:
+    Description: "Name of the created Lambda function"
+    Value: !Ref WebScraperFunction
+  
+  LambdaRoleARN:
+    Description: "ARN of the IAM Role for the Lambda function"
+    Value: !GetAtt LambdaExecutionRole.Arn
+
+  EventBridgeRuleName:
+    Description: "Name of the EventBridge rule"
+    Value: !Ref ScheduledRule
