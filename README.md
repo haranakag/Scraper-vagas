@@ -1,4 +1,5 @@
 Scraper de Vagas de TI com AWS Lambda
+
 Este projeto implementa um scraper serverless para coletar vagas de emprego de tecnologia a partir de buscas no Google. A solução é executada em um cronograma diário usando AWS Lambda, e os resultados são armazenados em um bucket S3. A infraestrutura é totalmente gerenciada como código usando um template do AWS CloudFormation.
 
 Sumário
