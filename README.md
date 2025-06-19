@@ -1,113 +1,107 @@
-Scraper de Vagas de TI com AWS Lambda
+Scraper de Vagas com AWS Lambda e CloudFormation
 
-Este projeto implementa um scraper serverless para coletar vagas de emprego de tecnologia a partir de buscas no Google. A solução é executada em um cronograma diário usando AWS Lambda, e os resultados são armazenados em um bucket S3. A infraestrutura é totalmente gerenciada como código usando um template do AWS CloudFormation.
+Um sistema de web scraping serverless e automatizado para monitorar vagas de emprego em tecnologia. O projeto utiliza AWS Lambda para execução, EventBridge para agendamento e S3 para armazenamento. Toda a infraestrutura é provisionada via AWS CloudFormation.
 
-Sumário
-Visão Geral
-Arquitetura da Solução
-Estrutura do Repositório
+✨ Features
+Automação Diária: Executa buscas automaticamente uma vez por dia.
+
+Busca Configurável: As queries de busca são facilmente gerenciadas através de um arquivo de texto (urls_to_scan.txt).
+
+Armazenamento Persistente: Salva todos os resultados encontrados em formato JSON em um bucket S3.
+
+Infraestrutura como Código (IaC): Deploy rápido, consistente e replicável com um único arquivo do CloudFormation.
+
+Serverless: Baixo custo e sem necessidade de gerenciar servidores.
+
+🏗️ Arquitetura e Fluxo de Dados
+O processo é simples e robusto, orquestrado inteiramente por serviços da AWS.
+
+┌────────────────────────┐      ┌────────────────────┐      ┌─────────────────────────┐
+│  Amazon EventBridge    │──────►│    AWS Lambda      │───► │  SerpApi (Google Search)│
+│ (Agendador 'Cron')     │      │ (Função Python)    │      └─────────────────────────┘
+└────────────────────────┘      └─────────┬──────────┘
+                                          │
+                                          ▼
+                                ┌────────────────────┐
+                                │   Amazon S3 Bucket │
+                                │ (Armazena .json)   │
+                                └────────────────────┘
+
+EventBridge dispara a função Lambda no horário agendado.
+
+Lambda lê as queries do arquivo urls_to_scan.txt.
+
+A função chama a SerpApi para cada query.
+
+Os resultados são processados e as vagas relevantes são salvas em um arquivo JSON no S3.
+
+🛠️ Tech Stack
+Cloud: Amazon Web Services (AWS)
+
+Computação: AWS Lambda
+
+Armazenamento: Amazon S3
+
+Agendamento: Amazon EventBridge
+
+IaC: AWS CloudFormation
+
+Linguagem: Python 3.11
+
+API Externa: SerpApi
+
+🚀 Guia de Instalação e Deploy
+Para colocar este projeto em produção, siga os passos abaixo.
+
 Pré-requisitos
-Configuração e Deploy
-Execução e Verificação
-Variáveis de Ambiente
-Como Contribuir
-Licença
-1. Visão Geral
-O objetivo deste projeto é automatizar a busca por vagas de emprego específicas. Em vez de realizar buscas manuais diariamente, um processo automatizado é executado na nuvem.
+Conta na AWS com AWS CLI configurado.
 
-Automação: Uma regra do Amazon EventBridge dispara a função uma vez por dia.
-Coleta de Dados: Uma função Python no AWS Lambda lê uma lista de queries de busca, chama a SerpApi para obter os resultados do Google e processa as informações.
-Armazenamento: Os dados das vagas encontradas são agregados e salvos como um único arquivo JSON em um bucket do Amazon S3.
-Infraestrutura como Código (IaC): Todos os recursos da AWS (Lambda, Role, EventBridge) são provisionados através de um template do AWS CloudFormation, garantindo um deploy consistente e replicável.
-2. Arquitetura da Solução
-O fluxo de trabalho da aplicação é o seguinte:
+Python e pip instalados.
 
-Agendador (Amazon EventBridge): Uma regra do tipo "cron" é acionada diariamente.
-Gatilho: A regra do EventBridge invoca a função AWS Lambda.
-Execução (AWS Lambda): a. A função Python é iniciada. b. Ela lê as queries de busca do arquivo urls_to_scan.txt. c. Para cada query, ela faz uma requisição para a SerpApi. d. A API retorna os resultados da busca do Google em formato JSON. e. O código processa os resultados, procurando por palavras-chave relevantes nos títulos e descrições.
-Armazenamento (Amazon S3): Todas as vagas encontradas são compiladas em uma lista e salvas como um arquivo JSON com timestamp em um bucket S3 designado.
-3. Estrutura do Repositório
-.
-├── lambda_function.py      # O código principal da função Lambda.
-├── urls_to_scan.txt        # Arquivo de texto com as queries de busca (uma por linha).
-├── requirements.txt        # Dependências Python do projeto.
-├── template.yaml           # Template do AWS CloudFormation para deploy da infraestrutura.
-└── README.md               # Esta documentação.
-4. Pré-requisitos
-Antes de começar, certifique-se de que você possui:
+Uma chave de API da SerpApi.
 
-Uma conta na AWS.
-AWS CLI instalado e configurado com suas credenciais.
-Python 3.9 ou superior.
-Uma conta na SerpApi e sua chave de API secreta.
-Dois buckets S3 criados na sua conta AWS:
-Um para armazenar o código da Lambda (o pacote .zip).
-Outro para armazenar os dados de saída (os arquivos .json).
-5. Configuração e Deploy
-Siga os passos abaixo para configurar e implantar a solução.
+Um bucket S3 para armazenar o código da aplicação (deployment_package.zip).
 
-Passo 1: Clonar o Repositório
-Bash
+Passos para o Deploy
+Clone este repositório:
 
 git clone <URL_DO_SEU_REPOSITORIO>
 cd <NOME_DO_REPOSITORIO>
-Passo 2: Configurar as Queries de Busca
-Edite o arquivo urls_to_scan.txt e adicione as queries de busca do Google que você deseja monitorar, uma por linha.
 
-Passo 3: Empacotar a Função Lambda
-Para que a AWS Lambda possa executar o código, você precisa empacotá-lo junto com suas dependências.
+Personalize as buscas:
+Edite o arquivo urls_to_scan.txt para incluir suas próprias queries de busca.
 
-Bash
+Crie o pacote de deploy:
+Este comando instala as dependências e cria o arquivo .zip pronto para upload.
 
-# Instalar as dependências na pasta atual
+# Instala dependências na pasta local
 pip install -r requirements.txt -t .
 
-# Criar o arquivo zip com o código, o arquivo de urls e as dependências
+# Cria o arquivo .zip
 zip -r deployment_package.zip .
-Passo 4: Fazer Upload do Pacote de Código
-Faça o upload do arquivo deployment_package.zip para o seu bucket S3 de código.
 
-Bash
+Faça upload do código para o S3:
 
 aws s3 cp deployment_package.zip s3://<SEU_BUCKET_DE_CODIGO>/
-Passo 5: Fazer o Deploy com CloudFormation
-Use a AWS CLI para implantar a stack definida no template.yaml. Substitua os valores dos parâmetros pelos seus.
 
-Bash
+Implante a stack com CloudFormation:
+Execute o comando abaixo, substituindo os valores dos parâmetros.
 
 aws cloudformation deploy \
   --template-file template.yaml \
-  --stack-name daily-job-scraper \
+  --stack-name "DailyJobScraperStack" \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
-    SerpApiKey="<SUA_CHAVE_SECRETA_DA_SERPAPI>" \
-    DataS3BucketName="<SEU_BUCKET_DE_DADOS>" \
-    LambdaCodeS3Bucket="<SEU_BUCKET_DE_CODIGO>" \
-    LambdaCodeS3Key="deployment_package.zip"
-6. Execução e Verificação
-Execução Manual (para Testes)
-Navegue até o console do AWS Lambda.
-Encontre a função criada (ex: daily-job-scraper-AshbyScraperFunction).
-Vá para a aba "Test" e crie um evento de teste com qualquer conteúdo JSON (ex: {}).
-Clique em "Test" para executar a função imediatamente.
-Execução Agendada
-A função será executada automaticamente uma vez por dia, conforme definido no parâmetro ScheduleExpression do CloudFormation (padrão: 12:00 UTC).
+    SerpApiKey="SUA_CHAVE_SECRETA_DA_SERPAPI" \
+    DataS3BucketName="seu-bucket-de-dados-de-saida" \
+    LambdaCodeS3Bucket="seu-bucket-de-codigo"
 
-Verificação dos Resultados
-Logs: Verifique os logs da execução no Amazon CloudWatch para depurar ou confirmar que a função rodou sem erros.
-Arquivos de Saída: Navegue até o seu bucket S3 de dados. Após uma execução bem-sucedida, você encontrará um novo arquivo .json com os resultados.
-7. Variáveis de Ambiente
-A função Lambda utiliza as seguintes variáveis de ambiente, que são configuradas automaticamente pelo CloudFormation durante o deploy:
+Usage
+Após o deploy, a função será executada automaticamente no horário definido (padrão: 12:00 UTC). Os resultados aparecerão no seu bucket S3 de dados, organizados em arquivos JSON com a data e hora da execução no nome.
 
-S3_BUCKET_NAME: O nome do bucket S3 de destino para os arquivos JSON.
-SERPAPI_API_KEY: Sua chave de API secreta da SerpApi.
-8. Como Contribuir
-Contribuições são bem-vindas! Por favor, siga o fluxo padrão de desenvolvimento:
+Para um teste imediato, você pode invocar a função Lambda manualmente através do Console da AWS.
 
-Faça um Fork do projeto.
-Crie uma nova branch (git checkout -b feature/nova-feature).
-Faça o commit das suas alterações (git commit -am 'Adiciona nova feature').
-Faça o push para a branch (git push origin feature/nova-feature).
-Abra um Pull Request.
-9. Licença
-Este projeto é licenciado sob a Licença MIT. Veja o arquivo LICENSE para mais detalhes.
+🤝 Contribuições
+Contribuições são sempre bem-vindas! Sinta-se à vontade para abrir um Pull Request ou relatar um problema (Issue).
+
+Este projeto é distribuído sob a licença MIT.
